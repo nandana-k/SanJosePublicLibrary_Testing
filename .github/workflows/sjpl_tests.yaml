@@ -1,0 +1,58 @@
+name: SJPL_tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Install dependencies
+      run:
+        pip install selenium pytest webdriver_manager
+
+    - name: Install Chrome
+      run: |
+        wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+        sudo mkdir -p /etc/apt/sources.list.d
+        sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list'
+        sudo apt-get update
+        sudo apt-get -y install google-chrome-stable
+
+    - name: Install Matching Chromedriver
+      run: |
+        CHROME_VERSION=$(google-chrome --version | grep -oP '\d+\.\d+\.\d+')
+        echo "Chrome version: $CHROME_VERSION"
+
+        # Get full ChromeDriver version
+        DRIVER_VERSION=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json" \
+          | jq -r --arg ver "$CHROME_VERSION" '.channels.Stable.version')
+        echo "Matching ChromeDriver version: $DRIVER_VERSION"
+
+        # Download the actual ChromeDriver zip URL
+        DRIVER_URL=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json" \
+          | jq -r --arg ver "$DRIVER_VERSION" '.channels.Stable.downloads.chromedriver[] | select(.platform == "linux64") | .url')
+
+        echo "Downloading ChromeDriver from: $DRIVER_URL"
+        wget -O chromedriver.zip "$DRIVER_URL"
+        unzip chromedriver.zip
+        sudo mv chromedriver-linux64/chromedriver /usr/local/bin/
+        sudo chmod +x /usr/local/bin/chromedriver
+        chromedriver --version
+
+    - name: Run Selenium tests with Pytest
+      run:  pytest tests/
