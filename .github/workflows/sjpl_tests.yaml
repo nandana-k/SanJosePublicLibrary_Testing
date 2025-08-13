@@ -1,8 +1,12 @@
 name: SJPL_tests
 
 on:
-  schedule:
-    - cron: '0 3 * * *'
+  push:
+    branches:
+      - main
+    pull_request:
+      branches:
+        - main
 
 jobs:
   test:
